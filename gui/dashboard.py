@@ -3,6 +3,7 @@ import calendar
 import tkinter as tk
 from datetime import date
 
+from gui.constants import MONTHS, WEEKDAYS
 from gui.theme import (
     BG, WHITE, NAVY, BLUE, BLUE_ACCENT, MUTED, TEXT, FONT,
     make_card, make_tree,
@@ -11,15 +12,6 @@ from gui.theme import (
 
 CARD_TINTS = (BLUE_LIGHT, "#F2F7FF", "#E7F0FF", "#F2F7FF")
 CARD_ACCENTS = (BLUE, BLUE_ACCENT, BLUE, BLUE_ACCENT)
-WEEKDAYS = ("Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min")
-MONTHS = (
-    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-    "Juli", "Agustus", "September", "Oktober", "November", "Desember",
-)
-MONTHS_SHORT = (
-    "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
-    "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
-)
 
 
 def build_dashboard(parent, app):
@@ -41,8 +33,8 @@ def build_dashboard(parent, app):
 
     _build_overview(content, app)
     _build_calendar_and_day_tasks(content, app)
-    app._calendar_month = date.today().replace(day=1)
-    app._calendar_selected = date.today()
+    app._calendar_displayed_month = date.today().replace(day=1)
+    app._calendar_selected_date = date.today()
     return page
 
 
@@ -78,14 +70,18 @@ def _build_overview(parent, app):
     upcoming.rowconfigure(1, weight=1)
     tk.Label(upcoming, text="Tugas mendatang", font=(FONT, 12, "bold"),
              bg=WHITE, fg=NAVY).grid(row=0, column=0, sticky="w", padx=12, pady=(10, 4))
-    frame, app.upcoming_tree = make_tree(
+    upcoming_table_frame, app.upcoming_tree = make_tree(
         upcoming,
         [("title", "Tugas"), ("subject", "Kategori"), ("deadline", "Tenggat")],
         [150, 100, 105],
         height=5,
     )
-    frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
-    app.upcoming_tree.bind("<Double-1>", lambda _event: _open_selected_upcoming(app))
+    upcoming_table_frame.grid(
+        row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+    app.upcoming_tree.bind(
+        "<Double-1>",
+        lambda _event: _open_selected_task(app, app.upcoming_tree),
+    )
 
 
 def _build_calendar_and_day_tasks(parent, app):
@@ -128,44 +124,51 @@ def _build_calendar_and_day_tasks(parent, app):
     day_header = tk.Frame(day_card, bg=WHITE)
     day_header.grid(row=0, column=0, sticky="ew", padx=12, pady=(10, 6))
     day_header.columnconfigure(0, weight=1)
-    app._day_tasks_title = tk.Label(
+    app._day_tasks_title_label = tk.Label(
         day_header, text="Tugas hari ini", font=(FONT, 13, "bold"), bg=WHITE, fg=NAVY)
-    app._day_tasks_title.grid(row=0, column=0, sticky="w")
+    app._day_tasks_title_label.grid(row=0, column=0, sticky="w")
     tk.Button(
         day_header, text="+", font=(FONT, 16, "bold"), width=2, relief="flat",
         bg=BLUE, fg=WHITE, activebackground=BLUE_HOVER, activeforeground=WHITE,
         command=app.add_task,
     ).grid(row=0, column=1)
-    frame, app.day_task_tree = make_tree(
+    day_tasks_table_frame, app.day_task_tree = make_tree(
         day_card,
         [("title", "Tugas"), ("subject", "Kategori"), ("time", "Jam")],
         [155, 95, 70],
         height=6,
     )
-    frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
-    app.day_task_tree.bind("<Double-1>", lambda _event: _open_selected_day_task(app))
-    app._day_tasks_empty = tk.Label(
+    day_tasks_table_frame.grid(
+        row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+    app.day_task_tree.bind(
+        "<Double-1>",
+        lambda _event: _open_selected_task(app, app.day_task_tree),
+    )
+    app._day_tasks_empty_label = tk.Label(
         day_card, text="", font=(FONT, 9), bg=WHITE, fg=MUTED)
-    app._day_tasks_empty.grid(row=2, column=0, sticky="w", padx=12, pady=(0, 8))
+    app._day_tasks_empty_label.grid(
+        row=2, column=0, sticky="w", padx=12, pady=(0, 8))
 
 
 def render_calendar(app):
-    month = app._calendar_month
-    app._calendar_month_label.config(text=f"{MONTHS[month.month - 1]} {month.year}")
+    calendar_month = app._calendar_displayed_month
+    app._calendar_month_label.config(
+        text=f"{MONTHS[calendar_month.month - 1]} {calendar_month.year}")
     for widget in app._calendar_grid.grid_slaves():
         if int(widget.grid_info()["row"]) > 0:
             widget.destroy()
 
     deadlines = {task.deadline.date() for task in app.manager.tasks}
-    weeks = calendar.monthcalendar(month.year, month.month)
-    for week_index, week in enumerate(weeks, start=1):
+    calendar_weeks = calendar.monthcalendar(
+        calendar_month.year, calendar_month.month)
+    for week_index, week in enumerate(calendar_weeks, start=1):
         for column, day in enumerate(week):
             if not day:
                 continue
-            selected = date(month.year, month.month, day)
-            is_selected = selected == app._calendar_selected
-            is_today = selected == date.today()
-            has_tasks = selected in deadlines
+            selected_date = date(calendar_month.year, calendar_month.month, day)
+            is_selected = selected_date == app._calendar_selected_date
+            is_today = selected_date == date.today()
+            has_tasks = selected_date in deadlines
             text = f"{day}\n{'•' if has_tasks else ' '}"
             background = BLUE if is_selected else WHITE
             foreground = WHITE if is_selected else NAVY
@@ -176,22 +179,16 @@ def render_calendar(app):
                 width=4, height=2, relief="flat", bd=0,
                 bg=background, fg=foreground, activebackground=HOVER_LIGHT,
                 activeforeground=NAVY,
-                command=lambda selected_date=selected: app._select_calendar_date(selected_date),
+                command=lambda chosen_date=selected_date: app._select_calendar_date(chosen_date),
             )
             button.grid(row=week_index, column=column, sticky="nsew", padx=2, pady=1)
 
 
-def _open_selected_upcoming(app):
-    selection = app.upcoming_tree.selection()
-    if selection:
-        task = app.manager.find_by_id(int(selection[0]))
-        if task is not None:
-            app.view_task(task)
+def _open_selected_task(app, task_tree):
+    selected_rows = task_tree.selection()
+    if not selected_rows:
+        return
 
-
-def _open_selected_day_task(app):
-    selection = app.day_task_tree.selection()
-    if selection:
-        task = app.manager.find_by_id(int(selection[0]))
-        if task is not None:
-            app.view_task(task)
+    task = app.manager.find_by_id(int(selected_rows[0]))
+    if task is not None:
+        app.view_task(task)

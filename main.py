@@ -1,5 +1,5 @@
 """Titik masuk aplikasi Smart To-Do."""
-from gui.application import DATA_DIR, DATA_FILE, SmartTodoApp
+from gui.application import SmartTodoApp
 
 
 if __name__ == "__main__":

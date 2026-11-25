@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 PRIORITIES = ("High", "Medium", "Low")
 STATUSES = ("Pending", "Completed")
 PRIORITY_RANK = {"High": 0, "Medium": 1, "Low": 2}  # makin kecil makin penting
-DT_FMT = "%Y-%m-%d %H:%M"
+DATETIME_FORMAT = "%Y-%m-%d %H:%M"
 
 
 class BaseTask:
@@ -24,19 +24,19 @@ class BaseTask:
         return self._title
 
     @title.setter
-    def title(self, value):
-        value = (value or "").strip()
-        if not value:
+    def title(self, title):
+        title = (title or "").strip()
+        if not title:
             raise ValueError("Judul tugas tidak boleh kosong.")
-        self._title = value
+        self._title = title
 
     @property
     def description(self):
         return self._description
 
     @description.setter
-    def description(self, value):
-        self._description = (value or "").strip()
+    def description(self, description):
+        self._description = (description or "").strip()
 
     def describe(self):
         return f"#{self._task_id} {self._title}"
@@ -64,38 +64,38 @@ class Task(BaseTask):
         return self._subject
 
     @subject.setter
-    def subject(self, value):
-        self._subject = (value or "").strip() or "Umum"
+    def subject(self, subject):
+        self._subject = (subject or "").strip() or "Umum"
 
     @property
     def deadline(self):
         return self._deadline
 
     @deadline.setter
-    def deadline(self, value):
-        if not isinstance(value, datetime):
+    def deadline(self, deadline):
+        if not isinstance(deadline, datetime):
             raise ValueError("Tenggat waktu harus bertipe datetime.")
-        self._deadline = value
+        self._deadline = deadline
 
     @property
     def priority(self):
         return self._priority
 
     @priority.setter
-    def priority(self, value):
-        if value not in PRIORITIES:
+    def priority(self, priority):
+        if priority not in PRIORITIES:
             raise ValueError("Prioritas tidak valid.")
-        self._priority = value
+        self._priority = priority
 
     @property
     def status(self):
         return self._status
 
     @status.setter
-    def status(self, value):
-        if value not in STATUSES:
+    def status(self, status):
+        if status not in STATUSES:
             raise ValueError("Status tidak valid.")
-        self._status = value
+        self._status = status
 
     @property
     def created(self):
@@ -137,21 +137,23 @@ class Task(BaseTask):
         now = now or datetime.now()
         if self.is_completed():
             return "Selesai"
-        delta = self._deadline - now
-        secs = int(abs(delta.total_seconds()))
-        days, rem = divmod(secs, 86400)
-        hours, rem = divmod(rem, 3600)
-        minutes = rem // 60
+        time_difference = self._deadline - now
+        total_seconds = int(abs(time_difference.total_seconds()))
+        days, remaining_seconds = divmod(total_seconds, 86400)
+        hours, remaining_seconds = divmod(remaining_seconds, 3600)
+        minutes = remaining_seconds // 60
         if days:
             text = f"{days} hari {hours} jam"
         elif hours:
             text = f"{hours} jam {minutes} menit"
         else:
             text = f"{minutes} menit"
-        return f"Terlambat {text}" if delta.total_seconds() < 0 else f"{text} lagi"
+        if time_difference.total_seconds() < 0:
+            return f"Terlambat {text}"
+        return f"{text} lagi"
 
     def deadline_text(self):
-        return self._deadline.strftime(DT_FMT)
+        return self._deadline.strftime(DATETIME_FORMAT)
 
     def describe(self):  # polymorphism: override BaseTask.describe
         return f"#{self._task_id} [{self._priority}] {self._title} ({self._subject}) - {self.deadline_text()}"
@@ -159,15 +161,21 @@ class Task(BaseTask):
     def to_dict(self):
         return {
             "id": self._task_id, "title": self._title, "description": self._description,
-            "subject": self._subject, "deadline": self._deadline.strftime(DT_FMT),
+            "subject": self._subject,
+            "deadline": self._deadline.strftime(DATETIME_FORMAT),
             "priority": self._priority, "status": self._status,
-            "created": self._created.strftime(DT_FMT),
+            "created": self._created.strftime(DATETIME_FORMAT),
         }
 
     @classmethod
-    def from_dict(cls, d):
+    def from_dict(cls, task_data):
         return cls(
-            int(d["id"]), d["title"], d.get("description", ""), d.get("subject", "Umum"),
-            datetime.strptime(d["deadline"], DT_FMT), d.get("priority", "Medium"),
-            d.get("status", "Pending"), datetime.strptime(d["created"], DT_FMT),
+            int(task_data["id"]),
+            task_data["title"],
+            task_data.get("description", ""),
+            task_data.get("subject", "Umum"),
+            datetime.strptime(task_data["deadline"], DATETIME_FORMAT),
+            task_data.get("priority", "Medium"),
+            task_data.get("status", "Pending"),
+            datetime.strptime(task_data["created"], DATETIME_FORMAT),
         )

@@ -7,7 +7,8 @@ from tkinter import messagebox
 
 from core.reminder_manager import ReminderManager
 from core.task_manager import TaskManager
-from gui.dashboard import MONTHS_SHORT, build_dashboard, render_calendar
+from gui.constants import MONTHS_SHORT
+from gui.dashboard import build_dashboard, render_calendar
 from gui.focus_page import build_focus_page
 from gui.reminder_page import build_reminder_page
 from gui.sidebar import build_sidebar, set_active_sidebar_item
@@ -107,10 +108,10 @@ class SmartTodoApp(tk.Tk):
         self.content.columnconfigure(0, weight=1)
         self.content.rowconfigure(0, weight=1)
 
-    def show_page(self, name):
-        self._refresh_page(name)
-        self.pages[name].tkraise()
-        set_active_sidebar_item(self, name)
+    def show_page(self, page_name):
+        self._refresh_page(page_name)
+        self.pages[page_name].tkraise()
+        set_active_sidebar_item(self, page_name)
 
     def open_form(self, task=None):
         if self._form_window is None or not self._form_window.winfo_exists():
@@ -120,15 +121,15 @@ class SmartTodoApp(tk.Tk):
 
         self.editing_id = task.task_id if task else None
         self._form_window.title("Ubah tugas" if task else "Tambah tugas")
-        self.form_title_lbl.config(text="Ubah tugas" if task else "Tambah tugas")
+        self.form_title_label.config(text="Ubah tugas" if task else "Tambah tugas")
         self.title_var.set(task.title if task else "")
-        self.desc_text.delete("1.0", "end")
-        self.desc_text.insert("1.0", task.description if task else "")
+        self.description_text.delete("1.0", "end")
+        self.description_text.insert("1.0", task.description if task else "")
         self.subject_var.set(task.subject if task else "")
         self.date_value = task.deadline.date() if task else None
         self.date_var.set(self.date_value.isoformat() if self.date_value else "")
         self.time_var.set(task.deadline.strftime("%H:%M") if task else "23:59")
-        self.form_prio_var.set(
+        self.form_priority_var.set(
             PRIORITY_LABELS[task.priority] if task else PRIORITY_LABELS["Medium"])
         self._form_window.update_idletasks()
         x = self.winfo_rootx() + (self.winfo_width() - self._form_window.winfo_width()) // 2
@@ -146,50 +147,50 @@ class SmartTodoApp(tk.Tk):
             date_value = self.date_value
             if date_value is None or self.date_var.get() != date_value.isoformat():
                 date_value = self.date_var.get()
-            data = validate_task_form(
+            validated_task_data = validate_task_form(
                 self.title_var.get(),
-                self.desc_text.get("1.0", "end"),
+                self.description_text.get("1.0", "end"),
                 self.subject_var.get(),
                 date_value,
                 self.time_var.get(),
-                self.form_prio_var.get(),
+                self.form_priority_var.get(),
             )
             if self.editing_id is None:
-                self.manager.add_task(**data)
-                message = "Tugas baru berhasil ditambahkan."
+                self.manager.add_task(**validated_task_data)
+                success_message = "Tugas baru berhasil ditambahkan."
             else:
-                self.manager.edit_task(self.editing_id, **data)
-                message = "Tugas berhasil diperbarui."
+                self.manager.edit_task(self.editing_id, **validated_task_data)
+                success_message = "Tugas berhasil diperbarui."
         except ValidationError as error:
             messagebox.showerror("Input tidak valid", str(error))
             return
         except KeyError as error:
             messagebox.showerror("Gagal", str(error))
             return
-        messagebox.showinfo("Berhasil", message)
+        messagebox.showinfo("Berhasil", success_message)
         self.cancel_form()
 
     def cancel_form(self):
-        window, self._form_window = self._form_window, None
+        form_window, self._form_window = self._form_window, None
         self.editing_id = None
         self.date_value = None
         if self._date_picker_window is not None:
             self._date_picker_window.destroy()
             self._date_picker_window = None
-        if window is None:
+        if form_window is None:
             return
         try:
-            if window.winfo_exists():
-                window.grab_release()
-                window.destroy()
+            if form_window.winfo_exists():
+                form_window.grab_release()
+                form_window.destroy()
         except tk.TclError:
             pass
 
     def _selected_id(self):
-        selection = self.task_tree.selection()
-        if not selection:
+        selected_rows = self.task_tree.selection()
+        if not selected_rows:
             return None
-        return validate_task_id(selection[0])
+        return validate_task_id(selected_rows[0])
 
     def _selected_task(self):
         try:
@@ -233,12 +234,15 @@ class SmartTodoApp(tk.Tk):
         if task.is_completed():
             messagebox.showinfo("Info", "Tugas ini sudah ditandai selesai.")
             return
+        self._complete_task(task, f"Tugas '{task.title}' ditandai selesai.")
+
+    def _complete_task(self, task, success_message):
         try:
             self.manager.complete_task(task.task_id)
         except KeyError as error:
             messagebox.showerror("Gagal", f"Tidak bisa menyelesaikan tugas: {error}")
             return
-        messagebox.showinfo("Berhasil", f"Tugas '{task.title}' ditandai selesai.")
+        messagebox.showinfo("Berhasil", success_message)
 
     def delete_selected_task(self):
         task = self._selected_task()
@@ -252,23 +256,23 @@ class SmartTodoApp(tk.Tk):
         messagebox.showinfo("Berhasil", "Tugas berhasil dihapus.")
 
     def refresh_all(self):
-        for name in ("dashboard", "tasks", "focus", "reminder"):
-            self._refresh_page(name)
+        for page_name in ("dashboard", "tasks", "focus", "reminder"):
+            self._refresh_page(page_name)
 
-    def _refresh_page(self, name):
+    def _refresh_page(self, page_name):
         refreshers = {
             "dashboard": self._refresh_dashboard,
             "tasks": self._refresh_tasks,
             "focus": self._refresh_focus,
             "reminder": self._refresh_reminders,
         }
-        refreshers[name]()
+        refreshers[page_name]()
 
     def _refresh_dashboard(self):
-        stats = self.manager.statistics()
-        stats["due_soon"] = len(self.manager.due_soon(hours=24))
-        for key, label in self._stat_labels.items():
-            label.config(text=str(stats[key]))
+        task_statistics = self.manager.statistics()
+        task_statistics["due_soon"] = len(self.manager.due_soon(hours=24))
+        for statistic_name, statistic_label in self._stat_labels.items():
+            statistic_label.config(text=str(task_statistics[statistic_name]))
 
         self.upcoming_tree.delete(*self.upcoming_tree.get_children())
         for task in self.manager.upcoming(limit=5):
@@ -279,126 +283,146 @@ class SmartTodoApp(tk.Tk):
         render_calendar(self)
         self._refresh_calendar_tasks()
 
-    def _change_calendar_month(self, offset):
-        month_index = self._calendar_month.month - 1 + offset
-        year = self._calendar_month.year + month_index // 12
-        month = month_index % 12 + 1
-        day = min(self._calendar_selected.day, monthrange(year, month)[1])
-        self._calendar_month = self._calendar_month.replace(year=year, month=month, day=1)
-        self._calendar_selected = self._calendar_selected.replace(
-            year=year, month=month, day=day)
+    def _change_calendar_month(self, month_offset):
+        target_month_index = (
+            self._calendar_displayed_month.month - 1 + month_offset)
+        target_year = (
+            self._calendar_displayed_month.year + target_month_index // 12)
+        target_month = target_month_index % 12 + 1
+        selected_day = min(
+            self._calendar_selected_date.day,
+            monthrange(target_year, target_month)[1],
+        )
+        self._calendar_displayed_month = self._calendar_displayed_month.replace(
+            year=target_year, month=target_month, day=1)
+        self._calendar_selected_date = self._calendar_selected_date.replace(
+            year=target_year, month=target_month, day=selected_day)
         render_calendar(self)
         self._refresh_calendar_tasks()
 
-    def _select_calendar_date(self, selected):
-        self._calendar_selected = selected
-        self._calendar_month = selected.replace(day=1)
+    def _select_calendar_date(self, selected_date):
+        self._calendar_selected_date = selected_date
+        self._calendar_displayed_month = selected_date.replace(day=1)
         render_calendar(self)
         self._refresh_calendar_tasks()
 
     def _refresh_calendar_tasks(self):
-        selected = self._calendar_selected
-        title = "Tugas hari ini" if selected == datetime.now().date() else (
-            f"Tugas {selected.day} {MONTHS_SHORT[selected.month - 1]}")
-        self._day_tasks_title.config(text=title)
+        selected_date = self._calendar_selected_date
+        section_title = (
+            "Tugas hari ini"
+            if selected_date == datetime.now().date()
+            else f"Tugas {selected_date.day} {MONTHS_SHORT[selected_date.month - 1]}"
+        )
+        self._day_tasks_title_label.config(text=section_title)
         self.day_task_tree.delete(*self.day_task_tree.get_children())
-        tasks = [task for task in self.manager.tasks if task.deadline.date() == selected]
-        for task in self.manager.sorted_by_deadline(tasks):
+        tasks_on_selected_date = [
+            task for task in self.manager.tasks
+            if task.deadline.date() == selected_date
+        ]
+        for task in self.manager.sorted_by_deadline(tasks_on_selected_date):
             self.day_task_tree.insert(
                 "", "end", iid=str(task.task_id),
                 values=(task.title, task.subject, task.deadline.strftime("%H:%M")),
                 tags=("done",) if task.is_completed() else (),
             )
-        self._day_tasks_empty.config(text="" if tasks else "Tidak ada tugas pada tanggal ini.")
+        self._day_tasks_empty_label.config(
+            text="" if tasks_on_selected_date else "Tidak ada tugas pada tanggal ini.")
 
     def _refresh_tasks(self):
-        selection = self.task_tree.selection()
-        selected_id = int(selection[0]) if selection else None
+        selected_rows = self.task_tree.selection()
+        selected_task_id = int(selected_rows[0]) if selected_rows else None
         self.task_tree.delete(*self.task_tree.get_children())
         status_filter = {
             "Semua": "All",
             "Belum selesai": "Pending",
             "Selesai": "Completed",
-        }[self.status_var.get()]
+        }[self.status_filter_var.get()]
         priority_filter = {
             "Semua": "All",
-            **{label: value for value, label in PRIORITY_LABELS.items()},
-        }[self.prio_var.get()]
+            **{
+                localized_priority: priority_name
+                for priority_name, localized_priority in PRIORITY_LABELS.items()
+            },
+        }[self.priority_filter_var.get()]
         tasks = self.manager.search(
-            self.search_var.get(), status_filter, priority_filter)
+            self.search_filter_var.get(), status_filter, priority_filter)
         for task in tasks:
             alert = task.alert_label(hours=self.reminder.soon_hours)
             alert_text = "Terlambat" if alert == "Overdue" else alert
-            tag = (
+            task_tag = (
                 "done" if task.is_completed()
                 else "overdue" if alert == "Overdue"
                 else "soon" if alert in ("Hari ini", "Segera")
                 else f"p_{task.priority}"
             )
             self.task_tree.insert(
-                "", "end", iid=str(task.task_id), tags=(tag,),
+                "", "end", iid=str(task.task_id), tags=(task_tag,),
                 values=(
                     task.title, task.subject, task.deadline_text(),
                     PRIORITY_LABELS[task.priority], STATUS_LABELS[task.status], alert_text,
                 ),
             )
-        self.task_count_lbl.config(text=f"{len(tasks)} tugas")
-        if selected_id is not None and self.task_tree.exists(str(selected_id)):
-            self.task_tree.selection_set(str(selected_id))
+        self.task_count_label.config(text=f"{len(tasks)} tugas")
+        if (
+            selected_task_id is not None
+            and self.task_tree.exists(str(selected_task_id))
+        ):
+            self.task_tree.selection_set(str(selected_task_id))
 
     def _refresh_focus(self):
-        task = self._focus_current = self.manager.recommend_next()
-        if task is None:
+        focus_task = self._focus_current_task = self.manager.recommend_next()
+        if focus_task is None:
             self.focus_done_icon.pack(anchor="w", pady=(0, 4))
-            self.focus_title_lbl.config(text="Semua tugas sudah selesai")
-            self.focus_info_lbl.config(
+            self.focus_title_label.config(text="Semua tugas sudah selesai")
+            self.focus_info_label.config(
                 text="Tidak ada tugas yang perlu diselesaikan. Tambahkan tugas baru atau beristirahat dulu.")
-            self.focus_prio_lbl.config(text="")
-            self.focus_left_lbl.config(text="")
+            self.focus_priority_label.config(text="")
+            self.focus_time_left_label.config(text="")
             self.focus_button.state(["disabled"])
             return
 
         self.focus_button.state(["!disabled"])
         self.focus_done_icon.pack_forget()
-        self.focus_title_lbl.config(text=task.title)
-        self.focus_info_lbl.config(
-            text=f"Kategori      : {task.subject}\nTenggat waktu: {task.deadline_text()}\n"
-            f"Deskripsi: {task.description or '-'}")
-        self.focus_prio_lbl.config(
-            text=f"Prioritas: {PRIORITY_LABELS[task.priority]}",
-            fg=PRIORITY_COLORS[task.priority])
-        self.focus_left_lbl.config(text=task.time_left_text())
+        self.focus_title_label.config(text=focus_task.title)
+        self.focus_info_label.config(
+            text=f"Kategori      : {focus_task.subject}\n"
+            f"Tenggat waktu: {focus_task.deadline_text()}\n"
+            f"Deskripsi: {focus_task.description or '-'}")
+        self.focus_priority_label.config(
+            text=f"Prioritas: {PRIORITY_LABELS[focus_task.priority]}",
+            fg=PRIORITY_COLORS[focus_task.priority])
+        self.focus_time_left_label.config(text=focus_task.time_left_text())
 
     def complete_focus_task(self):
-        task = self.manager.find_by_id(self._focus_current.task_id) if self._focus_current else None
+        if self._focus_current_task is None:
+            messagebox.showinfo("Info", "Tidak ada tugas yang direkomendasikan.")
+            return
+        task = self.manager.find_by_id(self._focus_current_task.task_id)
         if task is None:
             messagebox.showinfo("Info", "Tidak ada tugas yang direkomendasikan.")
             return
-        try:
-            self.manager.complete_task(task.task_id)
-        except KeyError as error:
-            messagebox.showerror("Gagal", str(error))
-            return
-        messagebox.showinfo("Berhasil", f"Mantap! '{task.title}' selesai.")
+        self._complete_task(task, f"Mantap! '{task.title}' selesai.")
 
     def _refresh_reminders(self):
-        soon = self.reminder.get_due_soon()
-        overdue = self.reminder.get_overdue()
-        self.reminder_info_lbl.config(
+        tasks_due_soon = self.reminder.get_due_soon()
+        overdue_tasks = self.reminder.get_overdue()
+        self.reminder_info_label.config(
             text=f"Pemeriksaan otomatis setiap {self.CHECK_INTERVAL_MS // 1000} detik. "
             f"Pengingat muncul saat tenggat kurang dari {self.reminder.soon_hours} jam lagi.")
-        self.soon_title.config(text=f"Mendekati tenggat ({len(soon)})")
-        self.over_title.config(text=f"Terlambat ({len(overdue)})")
-        for tree, tasks, tag in (
-            (self.soon_tree, soon, "soon"),
-            (self.over_tree, overdue, "overdue"),
+        self.soon_title_label.config(
+            text=f"Mendekati tenggat ({len(tasks_due_soon)})")
+        self.overdue_title_label.config(
+            text=f"Terlambat ({len(overdue_tasks)})")
+        for task_tree, task_list, row_tag in (
+            (self.soon_tree, tasks_due_soon, "soon"),
+            (self.over_tree, overdue_tasks, "overdue"),
         ):
-            tree.delete(*tree.get_children())
-            for task in tasks:
-                tree.insert(
+            task_tree.delete(*task_tree.get_children())
+            for task in task_list:
+                task_tree.insert(
                     "", "end",
                     values=(task.title, task.subject, task.deadline_text(), task.time_left_text()),
-                    tags=(tag,),
+                    tags=(row_tag,),
                 )
 
     def check_now(self):
@@ -407,11 +431,11 @@ class SmartTodoApp(tk.Tk):
         self.run_reminder_check(force_info=True)
 
     def run_reminder_check(self, force_info=False):
-        overdue, soon = self.reminder.collect_new_alerts()
-        if overdue or soon:
+        overdue_tasks, soon_tasks = self.reminder.collect_new_alerts()
+        if overdue_tasks or soon_tasks:
             messagebox.showwarning(
                 "Pengingat tenggat",
-                ReminderManager.build_message(overdue, soon),
+                ReminderManager.build_message(overdue_tasks, soon_tasks),
             )
         elif force_info:
             messagebox.showinfo(

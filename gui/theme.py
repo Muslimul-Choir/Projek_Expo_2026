@@ -6,7 +6,7 @@ NAVY, BLUE, BG, WHITE = "#17365D", "#2563EB", "#F4F8FF", "#FFFFFF"
 GREEN, RED, ORANGE = "#39866A", "#C85D68", "#C98547"
 TEXT, MUTED, BORDER = "#26364B", "#718096", "#DCE7F5"
 PURPLE_LIGHT, ORANGE_LIGHT = "#EAF2FF", "#FBF1E7"
-BLUE_LIGHT, GREEN_LIGHT = "#EAF2F8", "#EAF4EF"
+BLUE_LIGHT = "#EAF2F8"
 RED_LIGHT, HOVER_LIGHT = "#FAEDEF", "#E7F0FF"
 BLUE_HOVER = "#1D4ED8"
 BLUE_ACCENT, ORANGE_DARK = "#4F8FEA", "#8C5928"
@@ -45,30 +45,48 @@ def setup_styles(root):
     style.map("Ghost.TButton", background=[("active", HOVER_LIGHT)])
 
 
-def make_card(parent, **kw):
-    return tk.Frame(parent, bg=WHITE, highlightbackground=BORDER, highlightthickness=1, **kw)
+def make_card(parent, **frame_options):
+    return tk.Frame(
+        parent,
+        bg=WHITE,
+        highlightbackground=BORDER,
+        highlightthickness=1,
+        **frame_options,
+    )
 
 
 def page_header(parent, title, subtitle=""):
-    f = tk.Frame(parent, bg=BG)
-    tk.Label(f, text=title, font=(FONT, 20, "bold"), bg=BG, fg=NAVY).pack(anchor="w")
+    header_frame = tk.Frame(parent, bg=BG)
+    tk.Label(
+        header_frame, text=title, font=(FONT, 20, "bold"), bg=BG, fg=NAVY
+    ).pack(anchor="w")
     if subtitle:
-        tk.Label(f, text=subtitle, font=(FONT, 10), bg=BG, fg=MUTED).pack(anchor="w")
-    return f
+        tk.Label(
+            header_frame, text=subtitle, font=(FONT, 10), bg=BG, fg=MUTED
+        ).pack(anchor="w")
+    return header_frame
 
 
 def make_tree(parent, columns, widths, height=6):
     """columns: list (id, judul). Mengembalikan (frame, tree)."""
     frame = tk.Frame(parent, bg=WHITE)
-    tree = ttk.Treeview(frame, columns=[c[0] for c in columns], show="headings",
-                        height=height, selectmode="browse")
-    for (cid, label), w in zip(columns, widths):
-        tree.heading(cid, text=label)
-        tree.column(cid, width=w, minwidth=40, anchor="w", stretch=True)
-    sb = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
-    tree.configure(yscrollcommand=sb.set)
+    column_ids = [column_id for column_id, _label in columns]
+    tree = ttk.Treeview(
+        frame,
+        columns=column_ids,
+        show="headings",
+        height=height,
+        selectmode="browse",
+    )
+    for (column_id, label), column_width in zip(columns, widths):
+        tree.heading(column_id, text=label)
+        tree.column(
+            column_id, width=column_width, minwidth=40, anchor="w", stretch=True
+        )
+    scrollbar = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
+    tree.configure(yscrollcommand=scrollbar.set)
     tree.grid(row=0, column=0, sticky="nsew")
-    sb.grid(row=0, column=1, sticky="ns")
+    scrollbar.grid(row=0, column=1, sticky="ns")
     frame.rowconfigure(0, weight=1)
     frame.columnconfigure(0, weight=1)
     tree.tag_configure("overdue", background=RED_LIGHT, foreground=RED)

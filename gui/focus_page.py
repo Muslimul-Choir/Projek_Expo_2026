@@ -24,17 +24,19 @@ def build_focus_page(parent, app):
         body, width=30, height=30, bg=WHITE, highlightthickness=0)
     app.focus_done_icon.create_oval(3, 3, 27, 27, fill=GREEN, outline="")
     app.focus_done_icon.create_line(9, 15, 13, 19, 21, 10, fill=WHITE, width=2)
-    app.focus_title_lbl = tk.Label(body, text="", font=(FONT, 22, "bold"), bg=WHITE,
-                                   fg=NAVY, wraplength=600, justify="left")
-    app.focus_title_lbl.pack(anchor="w", pady=(4, 8))
-    app.focus_info_lbl = tk.Label(body, text="", font=(FONT, 11), bg=WHITE,
-                                  fg=TEXT, justify="left")
-    app.focus_info_lbl.pack(anchor="w")
-    app.focus_prio_lbl = tk.Label(body, text="", font=(FONT, 11, "bold"), bg=WHITE)
-    app.focus_prio_lbl.pack(anchor="w", pady=(8, 0))
-    app.focus_left_lbl = tk.Label(body, text="", font=(FONT, 12, "bold"),
-                                  bg=WHITE, fg=NAVY)
-    app.focus_left_lbl.pack(anchor="w", pady=(8, 16))
+    app.focus_title_label = tk.Label(
+        body, text="", font=(FONT, 22, "bold"), bg=WHITE,
+        fg=NAVY, wraplength=600, justify="left")
+    app.focus_title_label.pack(anchor="w", pady=(4, 8))
+    app.focus_info_label = tk.Label(
+        body, text="", font=(FONT, 11), bg=WHITE, fg=TEXT, justify="left")
+    app.focus_info_label.pack(anchor="w")
+    app.focus_priority_label = tk.Label(
+        body, text="", font=(FONT, 11, "bold"), bg=WHITE)
+    app.focus_priority_label.pack(anchor="w", pady=(8, 0))
+    app.focus_time_left_label = tk.Label(
+        body, text="", font=(FONT, 12, "bold"), bg=WHITE, fg=NAVY)
+    app.focus_time_left_label.pack(anchor="w", pady=(8, 16))
     app.focus_button = ttk.Button(body, text="Tandai selesai", style="Success.TButton",
                                   command=app.complete_focus_task)
     app.focus_button.pack(anchor="w")

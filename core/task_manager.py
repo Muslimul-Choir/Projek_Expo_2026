@@ -16,22 +16,25 @@ class TaskManager:
         self._listeners.append(callback)
 
     def _notify(self):
-        for cb in self._listeners:
-            cb()
+        for listener in self._listeners:
+            listener()
 
     # ---------- fungsi rekursif (Role 01) ----------
     @staticmethod
-    def _binary_search(tasks, task_id, low, high):
+    def _binary_search(tasks, task_id, first_index, last_index):
         """Pencarian biner REKURSIF. List selalu terurut menurut ID
         karena ID bertambah terus saat tugas ditambahkan."""
-        if low > high:                      # base case: tidak ditemukan
+        if first_index > last_index:
             return None
-        mid = (low + high) // 2
-        if tasks[mid].task_id == task_id:   # base case: ketemu
-            return tasks[mid]
-        if tasks[mid].task_id < task_id:
-            return TaskManager._binary_search(tasks, task_id, mid + 1, high)
-        return TaskManager._binary_search(tasks, task_id, low, mid - 1)
+        middle_index = (first_index + last_index) // 2
+        middle_task = tasks[middle_index]
+        if middle_task.task_id == task_id:
+            return middle_task
+        if middle_task.task_id < task_id:
+            return TaskManager._binary_search(
+                tasks, task_id, middle_index + 1, last_index)
+        return TaskManager._binary_search(
+            tasks, task_id, first_index, middle_index - 1)
 
     def find_by_id(self, task_id):
         return self._binary_search(self._tasks, task_id, 0, len(self._tasks) - 1)
@@ -77,92 +80,125 @@ class TaskManager:
     # ---------- pengurutan, pencarian, filter ----------
     def sorted_by_deadline(self, tasks=None):
         return sorted(self._tasks if tasks is None else tasks,
-                      key=lambda t: (t.deadline, PRIORITY_RANK[t.priority]))
+                      key=lambda task: (task.deadline, PRIORITY_RANK[task.priority]))
 
     def search(self, keyword="", status="All", priority="All"):
-        kw = (keyword or "").strip().lower()
-        result = []
-        for t in self._tasks:
-            if status != "All" and t.status != status:
+        normalized_keyword = (keyword or "").strip().lower()
+        matching_tasks = []
+        for task in self._tasks:
+            if status != "All" and task.status != status:
                 continue
-            if priority != "All" and t.priority != priority:
+            if priority != "All" and task.priority != priority:
                 continue
-            if kw and kw not in t.title.lower() and kw not in t.subject.lower() \
-                    and kw not in t.description.lower():
+            searchable_fields = (task.title, task.subject, task.description)
+            if normalized_keyword and all(
+                normalized_keyword not in field.lower()
+                for field in searchable_fields
+            ):
                 continue
-            result.append(t)
-        return self.sorted_by_deadline(result)
+            matching_tasks.append(task)
+        return self.sorted_by_deadline(matching_tasks)
 
     # ---------- deteksi deadline ----------
     def overdue_tasks(self, now=None):
-        now = now or datetime.now()
-        return self.sorted_by_deadline([t for t in self._tasks if t.is_overdue(now)])
-
-    def due_today(self, now=None):
-        now = now or datetime.now()
-        return self.sorted_by_deadline([t for t in self._tasks if t.is_due_today(now)])
+        current_time = now or datetime.now()
+        overdue_tasks = [
+            task for task in self._tasks if task.is_overdue(current_time)
+        ]
+        return self.sorted_by_deadline(overdue_tasks)
 
     def due_soon(self, now=None, hours=24):
-        now = now or datetime.now()
-        return self.sorted_by_deadline([t for t in self._tasks if t.is_due_soon(now, hours)])
+        current_time = now or datetime.now()
+        tasks_due_soon = [
+            task for task in self._tasks
+            if task.is_due_soon(current_time, hours)
+        ]
+        return self.sorted_by_deadline(tasks_due_soon)
 
     def upcoming(self, now=None, limit=5):
-        now = now or datetime.now()
-        pend = [t for t in self._tasks if not t.is_completed() and t.deadline >= now]
-        return self.sorted_by_deadline(pend)[:limit]
-
-    def recent(self, limit=5):
-        return sorted(self._tasks, key=lambda t: (t.created, t.task_id), reverse=True)[:limit]
+        current_time = now or datetime.now()
+        upcoming_tasks = [
+            task for task in self._tasks
+            if not task.is_completed() and task.deadline >= current_time
+        ]
+        return self.sorted_by_deadline(upcoming_tasks)[:limit]
 
     # ---------- statistik ----------
     def statistics(self, now=None):
-        now = now or datetime.now()
-        pending = [t for t in self._tasks if not t.is_completed()]
+        current_time = now or datetime.now()
+        pending_tasks = [
+            task for task in self._tasks if not task.is_completed()
+        ]
         return {
             "total": len(self._tasks),
-            "completed": len(self._tasks) - len(pending),
-            "pending": len(pending),
-            "overdue": sum(1 for t in pending if t.is_overdue(now)),
-            "due_today": sum(1 for t in pending if t.is_due_today(now)),
-            "priority": {p: sum(1 for t in pending if t.priority == p) for p in PRIORITY_RANK},
+            "completed": len(self._tasks) - len(pending_tasks),
+            "pending": len(pending_tasks),
+            "overdue": sum(
+                1 for task in pending_tasks if task.is_overdue(current_time)
+            ),
+            "due_today": sum(
+                1 for task in pending_tasks if task.is_due_today(current_time)
+            ),
+            "priority": {
+                priority_name: sum(
+                    1 for task in pending_tasks
+                    if task.priority == priority_name
+                )
+                for priority_name in PRIORITY_RANK
+            },
         }
 
     # ---------- Focus Mode ----------
     def recommend_next(self):
         """Pending saja; urut deadline terdekat, lalu prioritas tertinggi."""
-        pend = [t for t in self._tasks if not t.is_completed()]
-        if not pend:
+        pending_tasks = [
+            task for task in self._tasks if not task.is_completed()
+        ]
+        if not pending_tasks:
             return None
-        return min(pend, key=lambda t: (t.deadline, PRIORITY_RANK[t.priority]))
+        return min(
+            pending_tasks,
+            key=lambda task: (task.deadline, PRIORITY_RANK[task.priority]),
+        )
 
     # ---------- penyimpanan opsional (JSON, bukan database) ----------
     def save_json(self, path):
-        data = {"next_id": self._next_id, "tasks": [t.to_dict() for t in self._tasks]}
+        json_data = {
+            "next_id": self._next_id,
+            "tasks": [task.to_dict() for task in self._tasks],
+        }
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        with open(path, "w", encoding="utf-8") as json_file:
+            json.dump(json_data, json_file, indent=2, ensure_ascii=False)
 
     def load_json(self, path):
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        tasks = sorted((Task.from_dict(d) for d in data["tasks"]), key=lambda t: t.task_id)
-        self._tasks = tasks
-        self._next_id = max(int(data.get("next_id", 1)), (tasks[-1].task_id + 1) if tasks else 1)
+        with open(path, "r", encoding="utf-8") as json_file:
+            json_data = json.load(json_file)
+        loaded_tasks = sorted(
+            (Task.from_dict(task_data) for task_data in json_data["tasks"]),
+            key=lambda task: task.task_id,
+        )
+        self._tasks = loaded_tasks
+        stored_next_id = int(json_data.get("next_id", 1))
+        next_available_id = (
+            loaded_tasks[-1].task_id + 1 if loaded_tasks else 1
+        )
+        self._next_id = max(stored_next_id, next_available_id)
         self._notify()
 
     def load_sample_data(self):
-        now = datetime.now().replace(second=0, microsecond=0)
-        samples = [
+        current_time = datetime.now().replace(second=0, microsecond=0)
+        sample_tasks = [
             ("Kirim proposal", "Periksa lampiran sebelum dikirim", "Pekerjaan",
-             now + timedelta(hours=5), "High"),
+             current_time + timedelta(hours=5), "High"),
             ("Belanja kebutuhan", "Beli kebutuhan mingguan", "Pribadi",
-             now + timedelta(days=1), "Medium"),
+             current_time + timedelta(days=1), "Medium"),
             ("Periksa kendaraan", "Cek oli dan tekanan ban", "Rumah",
-             now + timedelta(days=2), "Low"),
+             current_time + timedelta(days=2), "Low"),
             ("Bayar tagihan internet", "Jatuh tempo pembayaran bulanan", "Keuangan",
-             now + timedelta(days=3), "Medium"),
+             current_time + timedelta(days=3), "Medium"),
             ("Rencanakan akhir pekan", "Tentukan kegiatan dan jadwal", "Pribadi",
-             now + timedelta(days=6), "Low"),
+             current_time + timedelta(days=6), "Low"),
         ]
-        for title, desc, subj, dl, pr in samples:
-            self.add_task(title, desc, subj, dl, pr)
+        for title, description, subject, deadline, priority in sample_tasks:
+            self.add_task(title, description, subject, deadline, priority)

@@ -4,6 +4,7 @@ import tkinter as tk
 from datetime import date
 from tkinter import ttk
 
+from gui.constants import MONTHS, WEEKDAYS
 from gui.theme import (
     BG, WHITE, TEXT, MUTED, FONT, NAVY, BLUE, BLUE_HOVER, HOVER_LIGHT,
     PRIORITY_COLORS, PRIORITY_LABELS,
@@ -11,19 +12,18 @@ from gui.theme import (
 )
 from models.task import PRIORITIES
 
-MONTHS = (
-    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-    "Juli", "Agustus", "September", "Oktober", "November", "Desember",
-)
-
 
 def _open_date_picker(parent, app):
     if app._date_picker_window is not None and app._date_picker_window.winfo_exists():
         app._date_picker_window.lift()
         return
 
-    selected_date = app.date_value or date.today()
-    month = [selected_date.year, selected_date.month]
+    today = date.today()
+    selected_date = app.date_value or today
+    if selected_date < today:
+        selected_date = today
+    displayed_year = selected_date.year
+    displayed_month = selected_date.month
     popup = tk.Toplevel(parent)
     app._date_picker_window = popup
     popup.title("Pilih tanggal")
@@ -46,15 +46,21 @@ def _open_date_picker(parent, app):
     month_label.grid(row=0, column=1, sticky="ew")
 
     def change_month(offset):
-        month_index = month[1] - 1 + offset
-        month[0] += month_index // 12
-        month[1] = month_index % 12 + 1
+        nonlocal displayed_year, displayed_month
+        month_index = displayed_month - 1 + offset
+        target_year = displayed_year + month_index // 12
+        target_month = month_index % 12 + 1
+        if (target_year, target_month) < (today.year, today.month):
+            return
+        displayed_year = target_year
+        displayed_month = target_month
         render_month()
 
-    ttk.Button(
+    previous_button = ttk.Button(
         header, text="‹", width=3, style="Ghost.TButton",
         command=lambda: change_month(-1),
-    ).grid(row=0, column=0, sticky="w")
+    )
+    previous_button.grid(row=0, column=0, sticky="w")
     ttk.Button(
         header, text="›", width=3, style="Ghost.TButton",
         command=lambda: change_month(1),
@@ -62,29 +68,36 @@ def _open_date_picker(parent, app):
 
     grid = tk.Frame(content, bg=WHITE)
     grid.pack(fill="both", expand=True)
-    for column, weekday in enumerate(("Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min")):
+    for column, weekday in enumerate(WEEKDAYS):
         grid.columnconfigure(column, weight=1, uniform="weekday")
         tk.Label(grid, text=weekday, bg=WHITE, fg=MUTED,
                  font=(FONT, 8, "bold")).grid(
                      row=0, column=column, sticky="ew", pady=(0, 5))
 
     def choose_day(day):
-        app.date_value = date(month[0], month[1], day)
+        app.date_value = date(displayed_year, displayed_month, day)
         app.date_var.set(app.date_value.isoformat())
         close()
 
     def render_month():
-        month_label.config(text=f"{MONTHS[month[1] - 1]} {month[0]}")
+        month_label.config(
+            text=f"{MONTHS[displayed_month - 1]} {displayed_year}")
+        previous_button.configure(
+            state="disabled"
+            if (displayed_year, displayed_month) <= (today.year, today.month)
+            else "normal"
+        )
         for widget in grid.grid_slaves():
             if int(widget.grid_info()["row"]) > 0:
                 widget.destroy()
         for row, week in enumerate(
                 calendar.Calendar(firstweekday=calendar.MONDAY).monthdayscalendar(
-                    month[0], month[1]), start=1):
+                    displayed_year, displayed_month), start=1):
             for column, day in enumerate(week):
                 if not day:
                     continue
-                day_date = date(month[0], month[1], day)
+                day_date = date(displayed_year, displayed_month, day)
+                is_past = day_date < today
                 is_selected = day_date == selected_date
                 tk.Button(
                     grid, text=str(day), font=(FONT, 9), width=4, relief="flat",
@@ -92,14 +105,19 @@ def _open_date_picker(parent, app):
                     fg=WHITE if is_selected else NAVY,
                     activebackground=BLUE_HOVER if is_selected else HOVER_LIGHT,
                     activeforeground=WHITE if is_selected else NAVY,
-                    command=lambda value=day: choose_day(value),
+                    state="disabled" if is_past else "normal",
+                    command=lambda selected_day=day: choose_day(selected_day),
                 ).grid(row=row, column=column, sticky="nsew", padx=1, pady=1)
 
     render_month()
     popup.update_idletasks()
-    x = parent.winfo_rootx() + (parent.winfo_width() - popup.winfo_width()) // 2
-    y = parent.winfo_rooty() + (parent.winfo_height() - popup.winfo_height()) // 2
-    popup.geometry(f"+{max(x, 0)}+{max(y, 0)}")
+    popup_x = parent.winfo_rootx() + (
+        parent.winfo_width() - popup.winfo_width()
+    ) // 2
+    popup_y = parent.winfo_rooty() + (
+        parent.winfo_height() - popup.winfo_height()
+    ) // 2
+    popup.geometry(f"+{max(popup_x, 0)}+{max(popup_y, 0)}")
 
 
 def build_task_page(parent, app):
@@ -115,33 +133,41 @@ def build_task_page(parent, app):
     inner.pack(fill="x", padx=14, pady=12)
     inner.columnconfigure(0, weight=1)
 
-    app.search_var = tk.StringVar()
-    app.status_var = tk.StringVar(value="Semua")
-    app.prio_var = tk.StringVar(value="Semua")
+    app.search_filter_var = tk.StringVar()
+    app.status_filter_var = tk.StringVar(value="Semua")
+    app.priority_filter_var = tk.StringVar(value="Semua")
     for column in range(3):
         inner.columnconfigure(column, weight=1 if column == 0 else 0)
 
     fields = (
-        ("CARI TUGAS", ttk.Entry(inner, textvariable=app.search_var, width=28)),
+        ("CARI TUGAS", ttk.Entry(
+            inner, textvariable=app.search_filter_var, width=28)),
         ("STATUS", ttk.Combobox(
-            inner, textvariable=app.status_var,
+            inner, textvariable=app.status_filter_var,
             values=["Semua", "Belum selesai", "Selesai"],
             state="readonly", width=14,
         )),
         ("PRIORITAS", ttk.Combobox(
-            inner, textvariable=app.prio_var,
-            values=["Semua", *(PRIORITY_LABELS[p] for p in PRIORITIES)],
+            inner, textvariable=app.priority_filter_var,
+            values=[
+                "Semua",
+                *(PRIORITY_LABELS[priority] for priority in PRIORITIES),
+            ],
             state="readonly", width=13,
         )),
     )
-    for column, (label, widget) in enumerate(fields):
-        tk.Label(inner, text=label, bg=WHITE, fg=MUTED,
+    for column, (field_label, widget) in enumerate(fields):
+        tk.Label(inner, text=field_label, bg=WHITE, fg=MUTED,
                  font=(FONT, 8, "bold")).grid(
                      row=0, column=column, sticky="w", pady=(0, 5),
                      padx=(0, 12) if column < 2 else 0)
         widget.grid(row=1, column=column, sticky="ew" if column == 0 else "w",
                     padx=(0, 12) if column < 2 else 0)
-    for variable in (app.search_var, app.status_var, app.prio_var):
+    for variable in (
+        app.search_filter_var,
+        app.status_filter_var,
+        app.priority_filter_var,
+    ):
         variable.trace_add("write", lambda *_args: app._refresh_tasks())
 
     card = make_card(page)
@@ -151,17 +177,19 @@ def build_task_page(parent, app):
     tk.Label(card, text="Semua tugas", bg=WHITE, fg=NAVY,
              font=(FONT, 12, "bold")).grid(
                  row=0, column=0, sticky="w", padx=14, pady=(12, 0))
-    app.task_count_lbl = tk.Label(card, text="", bg=WHITE, fg=MUTED,
-                                  font=(FONT, 9))
-    app.task_count_lbl.grid(row=0, column=1, sticky="e", padx=14, pady=(12, 0))
+    app.task_count_label = tk.Label(
+        card, text="", bg=WHITE, fg=MUTED, font=(FONT, 9))
+    app.task_count_label.grid(
+        row=0, column=1, sticky="e", padx=14, pady=(12, 0))
     columns = [
         ("title", "Judul"), ("subject", "Kategori"),
-        ("deadline", "Tenggat"), ("prio", "Prioritas"), ("status", "Status"),
+        ("deadline", "Tenggat"), ("priority", "Prioritas"), ("status", "Status"),
         ("alert", "Penanda"),
     ]
-    frame, app.task_tree = make_tree(
+    table_frame, app.task_tree = make_tree(
         card, columns, [205, 115, 130, 85, 115, 90], height=10)
-    frame.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
+    table_frame.grid(
+        row=1, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
     app.task_tree.configure(style="TaskList.Treeview")
     for priority, color in PRIORITY_COLORS.items():
         app.task_tree.tag_configure(f"p_{priority}", foreground=color)
@@ -194,9 +222,10 @@ def build_task_form_window(parent, app):
     window.columnconfigure(0, weight=1)
     window.rowconfigure(1, weight=1)
 
-    app.form_title_lbl = tk.Label(
+    app.form_title_label = tk.Label(
         window, text="Tambah tugas", font=(FONT, 19, "bold"), bg=BG, fg=NAVY)
-    app.form_title_lbl.grid(row=0, column=0, sticky="w", padx=20, pady=(18, 10))
+    app.form_title_label.grid(
+        row=0, column=0, sticky="w", padx=20, pady=(18, 10))
     card = make_card(window)
     card.grid(row=1, column=0, sticky="nsew", padx=20, pady=(0, 18))
     card.columnconfigure(1, weight=1)
@@ -205,7 +234,7 @@ def build_task_form_window(parent, app):
     app.subject_var = tk.StringVar()
     app.date_var = tk.StringVar()
     app.time_var = tk.StringVar()
-    app.form_prio_var = tk.StringVar(value=PRIORITY_LABELS["Medium"])
+    app.form_priority_var = tk.StringVar(value=PRIORITY_LABELS["Medium"])
     app.date_value = None
     app._date_picker_window = None
 
@@ -216,8 +245,9 @@ def build_task_form_window(parent, app):
 
     app.title_entry = ttk.Entry(card, textvariable=app.title_var)
     add_row(0, "Judul *", app.title_entry)
-    app.desc_text = tk.Text(card, height=4, font=(FONT, 10), relief="solid", borderwidth=1)
-    add_row(1, "Deskripsi", app.desc_text)
+    app.description_text = tk.Text(
+        card, height=4, font=(FONT, 10), relief="solid", borderwidth=1)
+    add_row(1, "Deskripsi", app.description_text)
     add_row(2, "Kategori", ttk.Entry(card, textvariable=app.subject_var))
     date_field = tk.Frame(card, bg=WHITE)
     date_field.columnconfigure(0, weight=1)
@@ -233,7 +263,7 @@ def build_task_form_window(parent, app):
     add_row(4, "Jam (HH:MM) *", ttk.Entry(card, textvariable=app.time_var))
     add_row(5, "Prioritas *", ttk.Combobox(
         card,
-        textvariable=app.form_prio_var,
+        textvariable=app.form_priority_var,
         values=[PRIORITY_LABELS[priority] for priority in PRIORITIES],
         state="readonly",
     ))
