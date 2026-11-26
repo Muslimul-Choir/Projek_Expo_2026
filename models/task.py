@@ -1,14 +1,14 @@
-"""Model data: BaseTask (parent class) dan Task (child class)."""
+"""Model data: BaseTask (induk) dan Task (turunan)."""
 from datetime import datetime, timedelta
 
 PRIORITIES = ("High", "Medium", "Low")
 STATUSES = ("Pending", "Completed")
 PRIORITY_RANK = {"High": 0, "Medium": 1, "Low": 2}  # makin kecil makin penting
-DT_FMT = "%Y-%m-%d %H:%M"
+DATETIME_FORMAT = "%Y-%m-%d %H:%M"
 
 
 class BaseTask:
-    """Parent class: atribut dasar sebuah tugas (encapsulation lewat property)."""
+    """Class induk: menyimpan id, judul, dan deskripsi tugas."""
 
     def __init__(self, task_id, title, description=""):
         self._task_id = task_id
@@ -46,15 +46,13 @@ class BaseTask:
 
 
 class Task(BaseTask):
-    """Child class: menambahkan kategori, tenggat, prioritas, dan status."""
+    """Class turunan: menambahkan kategori, tenggat, prioritas, dan status."""
 
     def __init__(self, task_id, title, description, subject, deadline,
                  priority, status="Pending", created=None):
         super().__init__(task_id, title, description)
         self._subject = subject
         self._deadline = deadline
-        self._priority = "Medium"
-        self._status = "Pending"
         self.priority = priority
         self.status = status
         self._created = created or datetime.now()
@@ -109,22 +107,18 @@ class Task(BaseTask):
 
     def is_overdue(self, now=None):
         now = now or datetime.now()
-        return (not self.is_completed()) and self._deadline < now
+        return not self.is_completed() and self._deadline < now
 
     def is_due_today(self, now=None):
         now = now or datetime.now()
-        # Hari ini & belum lewat jam deadline (yang sudah lewat dihitung Overdue).
-        return (not self.is_completed()) and self._deadline.date() == now.date() \
-            and self._deadline >= now
+        return not self.is_completed() and self._deadline.date() == now.date() and self._deadline >= now
 
     def is_due_soon(self, now=None, hours=24):
         now = now or datetime.now()
-        if self.is_completed() or self._deadline < now:
-            return False
-        return self._deadline - now <= timedelta(hours=hours)
+        return not self.is_completed() and now <= self._deadline <= now + timedelta(hours=hours)
 
     def alert_label(self, now=None, hours=24):
-        """Penanda khusus untuk tabel: Overdue / Hari ini / Segera / ''."""
+        """Penanda status tenggat untuk tabel: Overdue / Hari ini / Segera / ''."""
         if self.is_overdue(now):
             return "Overdue"
         if self.is_due_today(now):
@@ -137,37 +131,46 @@ class Task(BaseTask):
         now = now or datetime.now()
         if self.is_completed():
             return "Selesai"
-        delta = self._deadline - now
-        secs = int(abs(delta.total_seconds()))
-        days, rem = divmod(secs, 86400)
+        diff = self._deadline - now
+        total_secs = int(abs(diff.total_seconds()))
+        days, rem = divmod(total_secs, 86400)
         hours, rem = divmod(rem, 3600)
-        minutes = rem // 60
+        mins = rem // 60
         if days:
             text = f"{days} hari {hours} jam"
         elif hours:
-            text = f"{hours} jam {minutes} menit"
+            text = f"{hours} jam {mins} menit"
         else:
-            text = f"{minutes} menit"
-        return f"Terlambat {text}" if delta.total_seconds() < 0 else f"{text} lagi"
+            text = f"{mins} menit"
+        return f"Terlambat {text}" if diff.total_seconds() < 0 else f"{text} lagi"
 
     def deadline_text(self):
-        return self._deadline.strftime(DT_FMT)
+        return self._deadline.strftime(DATETIME_FORMAT)
 
-    def describe(self):  # polymorphism: override BaseTask.describe
+    def describe(self):  # polymorphism: menimpa BaseTask.describe
         return f"#{self._task_id} [{self._priority}] {self._title} ({self._subject}) - {self.deadline_text()}"
 
     def to_dict(self):
         return {
-            "id": self._task_id, "title": self._title, "description": self._description,
-            "subject": self._subject, "deadline": self._deadline.strftime(DT_FMT),
-            "priority": self._priority, "status": self._status,
-            "created": self._created.strftime(DT_FMT),
+            "id": self._task_id,
+            "title": self._title,
+            "description": self._description,
+            "subject": self._subject,
+            "deadline": self.deadline_text(),
+            "priority": self._priority,
+            "status": self._status,
+            "created": self._created.strftime(DATETIME_FORMAT),
         }
 
     @classmethod
-    def from_dict(cls, d):
+    def from_dict(cls, data):
         return cls(
-            int(d["id"]), d["title"], d.get("description", ""), d.get("subject", "Umum"),
-            datetime.strptime(d["deadline"], DT_FMT), d.get("priority", "Medium"),
-            d.get("status", "Pending"), datetime.strptime(d["created"], DT_FMT),
+            int(data["id"]),
+            data["title"],
+            data.get("description", ""),
+            data.get("subject", "Umum"),
+            datetime.strptime(data["deadline"], DATETIME_FORMAT),
+            data.get("priority", "Medium"),
+            data.get("status", "Pending"),
+            datetime.strptime(data["created"], DATETIME_FORMAT),
         )

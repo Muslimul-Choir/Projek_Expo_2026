@@ -1,4 +1,4 @@
-"""TaskManager: CRUD, pencarian rekursif, statistik, pengurutan, Focus Mode."""
+"""TaskManager: kelola daftar tugas (CRUD, cari, urutkan, statistik, Focus Mode, JSON)."""
 import json
 import os
 from datetime import datetime, timedelta
@@ -8,28 +8,28 @@ from models.task import Task, PRIORITY_RANK
 
 class TaskManager:
     def __init__(self):
-        self._tasks = []        # List of Task (data hanya di memori)
+        self._tasks = []
         self._next_id = 1
-        self._listeners = []    # observer: dipanggil tiap data berubah
+        self._listeners = []
 
     def add_listener(self, callback):
         self._listeners.append(callback)
 
     def _notify(self):
-        for cb in self._listeners:
-            cb()
+        for callback in self._listeners:
+            callback()
 
-    # ---------- fungsi rekursif (Role 01) ----------
+    # ---------- pencarian biner rekursif ----------
     @staticmethod
     def _binary_search(tasks, task_id, low, high):
-        """Pencarian biner REKURSIF. List selalu terurut menurut ID
-        karena ID bertambah terus saat tugas ditambahkan."""
-        if low > high:                      # base case: tidak ditemukan
+        """Cari tugas berdasarkan ID secara rekursif (list selalu urut ID)."""
+        if low > high:
             return None
         mid = (low + high) // 2
-        if tasks[mid].task_id == task_id:   # base case: ketemu
-            return tasks[mid]
-        if tasks[mid].task_id < task_id:
+        mid_task = tasks[mid]
+        if mid_task.task_id == task_id:
+            return mid_task
+        if mid_task.task_id < task_id:
             return TaskManager._binary_search(tasks, task_id, mid + 1, high)
         return TaskManager._binary_search(tasks, task_id, low, mid - 1)
 
@@ -74,10 +74,10 @@ class TaskManager:
         self._notify()
         return task
 
-    # ---------- pengurutan, pencarian, filter ----------
+    # ---------- urutkan, cari, dan filter ----------
     def sorted_by_deadline(self, tasks=None):
-        return sorted(self._tasks if tasks is None else tasks,
-                      key=lambda t: (t.deadline, PRIORITY_RANK[t.priority]))
+        items = self._tasks if tasks is None else tasks
+        return sorted(items, key=lambda t: (t.deadline, PRIORITY_RANK[t.priority]))
 
     def search(self, keyword="", status="All", priority="All"):
         kw = (keyword or "").strip().lower()
@@ -87,8 +87,7 @@ class TaskManager:
                 continue
             if priority != "All" and t.priority != priority:
                 continue
-            if kw and kw not in t.title.lower() and kw not in t.subject.lower() \
-                    and kw not in t.description.lower():
+            if kw and kw not in t.title.lower() and kw not in t.subject.lower() and kw not in t.description.lower():
                 continue
             result.append(t)
         return self.sorted_by_deadline(result)
@@ -98,21 +97,14 @@ class TaskManager:
         now = now or datetime.now()
         return self.sorted_by_deadline([t for t in self._tasks if t.is_overdue(now)])
 
-    def due_today(self, now=None):
-        now = now or datetime.now()
-        return self.sorted_by_deadline([t for t in self._tasks if t.is_due_today(now)])
-
     def due_soon(self, now=None, hours=24):
         now = now or datetime.now()
         return self.sorted_by_deadline([t for t in self._tasks if t.is_due_soon(now, hours)])
 
     def upcoming(self, now=None, limit=5):
         now = now or datetime.now()
-        pend = [t for t in self._tasks if not t.is_completed() and t.deadline >= now]
-        return self.sorted_by_deadline(pend)[:limit]
-
-    def recent(self, limit=5):
-        return sorted(self._tasks, key=lambda t: (t.created, t.task_id), reverse=True)[:limit]
+        items = [t for t in self._tasks if not t.is_completed() and t.deadline >= now]
+        return self.sorted_by_deadline(items)[:limit]
 
     # ---------- statistik ----------
     def statistics(self, now=None):
@@ -129,40 +121,39 @@ class TaskManager:
 
     # ---------- Focus Mode ----------
     def recommend_next(self):
-        """Pending saja; urut deadline terdekat, lalu prioritas tertinggi."""
-        pend = [t for t in self._tasks if not t.is_completed()]
-        if not pend:
+        """Pilih 1 tugas belum selesai dengan tenggat terdekat & prioritas tertinggi."""
+        pending = [t for t in self._tasks if not t.is_completed()]
+        if not pending:
             return None
-        return min(pend, key=lambda t: (t.deadline, PRIORITY_RANK[t.priority]))
+        return min(pending, key=lambda t: (t.deadline, PRIORITY_RANK[t.priority]))
 
-    # ---------- penyimpanan opsional (JSON, bukan database) ----------
+    # ---------- simpan & muat JSON ----------
     def save_json(self, path):
-        data = {"next_id": self._next_id, "tasks": [t.to_dict() for t in self._tasks]}
+        data = {
+            "next_id": self._next_id,
+            "tasks": [t.to_dict() for t in self._tasks],
+        }
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        with open(path, "w", encoding="utf-8") as file:
+            json.dump(data, file, indent=2, ensure_ascii=False)
 
     def load_json(self, path):
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        with open(path, "r", encoding="utf-8") as file:
+            data = json.load(file)
         tasks = sorted((Task.from_dict(d) for d in data["tasks"]), key=lambda t: t.task_id)
         self._tasks = tasks
-        self._next_id = max(int(data.get("next_id", 1)), (tasks[-1].task_id + 1) if tasks else 1)
+        last_id = tasks[-1].task_id + 1 if tasks else 1
+        self._next_id = max(int(data.get("next_id", 1)), last_id)
         self._notify()
 
     def load_sample_data(self):
         now = datetime.now().replace(second=0, microsecond=0)
         samples = [
-            ("Kirim proposal", "Periksa lampiran sebelum dikirim", "Pekerjaan",
-             now + timedelta(hours=5), "High"),
-            ("Belanja kebutuhan", "Beli kebutuhan mingguan", "Pribadi",
-             now + timedelta(days=1), "Medium"),
-            ("Periksa kendaraan", "Cek oli dan tekanan ban", "Rumah",
-             now + timedelta(days=2), "Low"),
-            ("Bayar tagihan internet", "Jatuh tempo pembayaran bulanan", "Keuangan",
-             now + timedelta(days=3), "Medium"),
-            ("Rencanakan akhir pekan", "Tentukan kegiatan dan jadwal", "Pribadi",
-             now + timedelta(days=6), "Low"),
+            ("Kirim proposal", "Periksa lampiran sebelum dikirim", "Pekerjaan", now + timedelta(hours=5), "High"),
+            ("Belanja kebutuhan", "Beli kebutuhan mingguan", "Pribadi", now + timedelta(days=1), "Medium"),
+            ("Periksa kendaraan", "Cek oli dan tekanan ban", "Rumah", now + timedelta(days=2), "Low"),
+            ("Bayar tagihan internet", "Jatuh tempo pembayaran bulanan", "Keuangan", now + timedelta(days=3), "Medium"),
+            ("Rencanakan akhir pekan", "Tentukan kegiatan dan jadwal", "Pribadi", now + timedelta(days=6), "Low"),
         ]
-        for title, desc, subj, dl, pr in samples:
-            self.add_task(title, desc, subj, dl, pr)
+        for args in samples:
+            self.add_task(*args)

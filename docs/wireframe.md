@@ -1,69 +1,110 @@
-# Wireframe
+# Wireframe — Smart To-Do with Reminders
 
-Semua halaman memakai sidebar kiri (Ringkasan, Daftar tugas, Mode fokus, Pengingat) dan konten utama di sebelah kanan.
+## Tema & Tata Letak Umum
+- **Sidebar Kiri** (`#17365D` Navy): Logo aplikasi dan menu navigasi (`Ringkasan`, `Daftar tugas`, `Mode fokus`) dengan indikator aktif biru (`#2563EB`).
+- **Area Konten Kanan** (`#F4F8FF` Biru Pucat): Kartu putih (`#FFFFFF`) dengan garis tepi lembut (`#DCE7F5`).
+- **Warna Status & Prioritas**: Hijau (`#39866A` / Rendah), Jingga (`#C98547` / Sedang / Segera), Merah (`#C85D68` / Tinggi / Terlambat).
 
-## Ringkasan
-```
-+---------+--------------------------------------------------+
-| SIDEBAR | Halo!                                            |
-| Smart   | Ringkasan aktivitasmu                           |
-| To-Do   | +----------------------+ +---------------------+ |
-|         | | Ringkasan           | | Kalender            | |
-| Ringkas | | [Hari ini] [Segera] | | < November 2026 >   | |
-|  Tugas  | | [Selesai] [Semua]   | | Sen Sel Rab Kam Jum | |
-|  Fokus  | | Tugas mendatang     | | Tugas hari ini      | |
-|  Ingat  | | Tugas/Kategori/Tenggat| | Tugas/Kategori/Jam | |
-+---------+--------------------------------------------------+
-```
+---
 
-## Daftar tugas
-```
-| Daftar tugas                                               |
-| +--------------------------------------------------------+ |
-| | CARI TUGAS             STATUS       PRIORITAS          | |
-| | [__________________]   [Semua v]    [Semua v]          | |
-| +--------------------------------------------------------+ |
-| Semua tugas                                      n tugas  |
-| +--------------------------------------------------------+ |
-| | Judul | Kategori | Tenggat | Prioritas | Status | !    | |
-| | ...                                                    | |
-| +--------------------------------------------------------+ |
-| [+ Tambah] [Ubah] [Lihat] [Selesai] [Hapus]                |
-```
-
-## Tambah / Ubah tugas
-```
-| Tambah / Ubah tugas                                        |
-| +--------------------------------------------------------+ |
-| | Judul *         [________________________]            | |
-| | Deskripsi       [________________________]            | |
-| | Kategori        [________________________]            | |
-| | Tanggal *       [Tanggal terpilih] [Pilih tanggal]      | |
-| | Jam *           [HH:MM]                                | |
-| | Prioritas *     [Sedang v]                             | |
-| |                 [Simpan] [Batal]                       | |
-| +--------------------------------------------------------+ |
+## 1. Halaman Ringkasan (`dashboard.py`)
+```text
++---------------+------------------------------------------------------+
+| Smart To-Do   | Ringkasan aktivitasmu                                |
+| Rencana,      | Pantau tenggat dan progres tugasmu di satu tempat    |
+| lebih teratur |                                                      |
+| ------------- | +------------+ +------------+ +-----------+ +------+ |
+| MENU          | | 1          | | 2          | | 0         | | 5    | |
+| > Ringkasan   | | Hari ini   | | Segera     | | Selesai   | | Semua| |
+|   Daftar tugas| +------------+ +------------+ +-----------+ +------+ |
+|   Mode fokus  |                                                      |
+|               | +--------------------------------------------------+ |
+|               | | Tugas mendatang                                  | |
+|               | | Tugas            | Kategori       | Tenggat      | |
+|               | | -----------------|----------------|------------- | |
+|               | | Kirim proposal   | Pekerjaan      | 2026-11-...  | |
+|               | | Belanja kebutuhan| Pribadi        | 2026-11-...  | |
+|               | +--------------------------------------------------+ |
+| Semua tugas,  |                                                      |
+| satu tempat.  |                                                      |
++---------------+------------------------------------------------------+
 ```
 
-## Mode fokus
-```
-| Mode fokus                                                 |
-| +--------------------------------------------------------+ |
-| | BERIKUTNYA                                             | |
-| | Judul tugas (besar)                                     | |
-| | Kategori / Tenggat / Deskripsi                         | |
-| | Prioritas: Tinggi       Sisa waktu: 5 jam 0 menit      | |
-| | [Tandai selesai]                                        | |
-| +--------------------------------------------------------+ |
+---
+
+## 2. Halaman Daftar Tugas (`task_page.py`)
+```text
++---------------+------------------------------------------------------+
+| SIDEBAR       | Daftar tugas                                         |
+|               | Atur pekerjaan, kegiatan, dan hal penting lainnya    |
+| > Daftar tugas|                                                      |
+|               | +--------------------------------------------------+ |
+|               | | Semua tugas                              5 tugas | |
+|               | | Judul  | Kategori | Tenggat | Prioritas | Status | |
+|               | | -------|----------|---------|-----------|--------| |
+|               | | ...    | ...      | ...     | Tinggi    | Belum  | |
+|               | +--------------------------------------------------+ |
+|               | [+ Tambah] [Ubah] [Lihat] [Selesai] [Hapus]          |
+|               |                 Klik dua kali untuk melihat detail.  |
++---------------+------------------------------------------------------+
 ```
 
-## Pengingat
+---
+
+## 3. Popup Form Tambah / Ubah Tugas (`task_page.py`)
+```text
++--------------------------------------------------+
+| Tambah / Ubah tugas                              |
++--------------------------------------------------+
+| Judul *              [________________________]  |
+| Deskripsi            [________________________]  |
+|                      [________________________]  |
+| Kategori             [________________________]  |
+| Tanggal (YYYY-MM-DD) [2026-11-26              ]  |
+| Jam (HH:MM) *        [23:59                   ]  |
+| Prioritas *          [Sedang                 v]  |
+|                                                  |
+|                      [Simpan]  [Batal]           |
++--------------------------------------------------+
 ```
-| Pengingat                                                  |
-| Info: periksa tiap 30 detik, tenggat dekat = kurang 24 jam |
-| +-- Mendekati tenggat (n) ---------------------------------+|
-| | Tugas | Kategori | Tenggat | Sisa waktu                  ||
-| +-- Terlambat (n) -----------------------------------------+|
-| | Tugas | Kategori | Tenggat | Sisa waktu                  ||
-| [Periksa sekarang]                                         |
+
+---
+
+## 4. Halaman Mode Fokus (`focus_page.py`)
+```text
++---------------+------------------------------------------------------+
+| SIDEBAR       | Mode fokus                                           |
+|               | Selesaikan satu hal penting dalam satu waktu         |
+| > Mode fokus  |                                                      |
+|               | +--------------------------------------------------+ |
+|               | | BERIKUTNYA                                       | |
+|               | | Kirim proposal                                   | |
+|               | | Kategori      : Pekerjaan                        | |
+|               | | Tenggat waktu : 2026-11-26 20:00                 | |
+|               | | Deskripsi     : Periksa lampiran sebelum dikirim | |
+|               | |                                                  | |
+|               | | Prioritas: Tinggi                                | |
+|               | | 5 jam 0 menit lagi                               | |
+|               | |                                                  | |
+|               | | [Tandai selesai]                                 | |
+|               | +--------------------------------------------------+ |
+|               | Urutan: belum selesai, tenggat terdekat, prioritas.  |
++---------------+------------------------------------------------------+
+```
+
+---
+
+## 5. Popup Pengingat Otomatis (`application.py`)
+```text
++--------------------------------------------------+
+| (!) Pengingat tenggat                            |
++--------------------------------------------------+
+| TUGAS TERLAMBAT:                                 |
+|   - Tugas A (Kategori) - Terlambat 1 jam 20 mnt  |
+|                                                  |
+| TENGGAT WAKTU MENDEKAT:                          |
+|   - Kirim proposal (Pekerjaan) - 2026-11-26 ...  |
+|                                                  |
+|                       [ OK ]                     |
++--------------------------------------------------+
 ```
