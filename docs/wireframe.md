@@ -1,28 +1,24 @@
 # Wireframe
 
-Semua halaman memakai sidebar kiri (Ringkasan, Daftar tugas, Mode fokus, Pengingat) dan konten utama di sebelah kanan.
+Semua halaman memakai sidebar kiri (`Ringkasan`, `Daftar tugas`, `Mode fokus`) dan konten utama di sebelah kanan.
 
 ## Ringkasan
 ```
 +---------+--------------------------------------------------+
-| SIDEBAR | Halo!                                            |
-| Smart   | Ringkasan aktivitasmu                           |
-| To-Do   | +----------------------+ +---------------------+ |
-|         | | Ringkasan           | | Kalender            | |
-| Ringkas | | [Hari ini] [Segera] | | < November 2026 >   | |
-|  Tugas  | | [Selesai] [Semua]   | | Sen Sel Rab Kam Jum | |
-|  Fokus  | | Tugas mendatang     | | Tugas hari ini      | |
-|  Ingat  | | Tugas/Kategori/Tenggat| | Tugas/Kategori/Jam | |
+| SIDEBAR | Ringkasan aktivitasmu                            |
+| Smart   | +----------+ +----------+ +----------+ +-------+ |
+| To-Do   | | Hari ini | | Segera   | | Selesai  | | Semua | |
+|         | +----------+ +----------+ +----------+ +-------+ |
+| Ringkas | +----------------------------------------------+ |
+|  Tugas  | | Tugas mendatang                              | |
+|  Fokus  | | Tugas        | Kategori    | Tenggat         | |
+|         | | ...                                          | |
 +---------+--------------------------------------------------+
 ```
 
 ## Daftar tugas
 ```
 | Daftar tugas                                               |
-| +--------------------------------------------------------+ |
-| | CARI TUGAS             STATUS       PRIORITAS          | |
-| | [__________________]   [Semua v]    [Semua v]          | |
-| +--------------------------------------------------------+ |
 | Semua tugas                                      n tugas  |
 | +--------------------------------------------------------+ |
 | | Judul | Kategori | Tenggat | Prioritas | Status | !    | |
@@ -35,13 +31,13 @@ Semua halaman memakai sidebar kiri (Ringkasan, Daftar tugas, Mode fokus, Penging
 ```
 | Tambah / Ubah tugas                                        |
 | +--------------------------------------------------------+ |
-| | Judul *         [________________________]            | |
-| | Deskripsi       [________________________]            | |
-| | Kategori        [________________________]            | |
-| | Tanggal *       [Tanggal terpilih] [Pilih tanggal]      | |
-| | Jam *           [HH:MM]                                | |
-| | Prioritas *     [Sedang v]                             | |
-| |                 [Simpan] [Batal]                       | |
+| | Judul *              [________________________]        | |
+| | Deskripsi            [________________________]        | |
+| | Kategori             [________________________]        | |
+| | Tanggal (YYYY-MM-DD) [YYYY-MM-DD]                      | |
+| | Jam (HH:MM) *        [HH:MM]                           | |
+| | Prioritas *          [Sedang v]                        | |
+| |                      [Simpan] [Batal]                  | |
 | +--------------------------------------------------------+ |
 ```
 
@@ -50,20 +46,9 @@ Semua halaman memakai sidebar kiri (Ringkasan, Daftar tugas, Mode fokus, Penging
 | Mode fokus                                                 |
 | +--------------------------------------------------------+ |
 | | BERIKUTNYA                                             | |
-| | Judul tugas (besar)                                     | |
+| | Judul tugas (besar)                                    | |
 | | Kategori / Tenggat / Deskripsi                         | |
 | | Prioritas: Tinggi       Sisa waktu: 5 jam 0 menit      | |
-| | [Tandai selesai]                                        | |
+| | [Tandai selesai]                                       | |
 | +--------------------------------------------------------+ |
-```
-
-## Pengingat
-```
-| Pengingat                                                  |
-| Info: periksa tiap 30 detik, tenggat dekat = kurang 24 jam |
-| +-- Mendekati tenggat (n) ---------------------------------+|
-| | Tugas | Kategori | Tenggat | Sisa waktu                  ||
-| +-- Terlambat (n) -----------------------------------------+|
-| | Tugas | Kategori | Tenggat | Sisa waktu                  ||
-| [Periksa sekarang]                                         |
 ```
