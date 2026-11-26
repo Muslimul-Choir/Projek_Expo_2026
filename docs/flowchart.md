@@ -1,30 +1,41 @@
 # Flowchart — Smart To-Do with Reminders
 
+Diagram berikut menggambarkan alur utama aplikasi mulai dari inisialisasi data, navigasi antar layar, pengelolaan tugas (CRUD) dengan validasi, hingga pengecekan pengingat popup secara berkala.
+
 ```mermaid
 flowchart TD
-    A([Mulai aplikasi]) --> B[Muat data dari data/tasks.json atau data contoh]
-    B --> C[Dashboard]
-    C --> D[View Tasks]
-    D --> E{Pilih aksi}
-    E -->|Add / Edit| F[Isi form]
-    E -->|Delete| G{Konfirmasi hapus?}
-    E -->|Complete| H{Status Pending?}
-    F --> I{Input valid?}
-    I -->|Tidak| J[showerror] --> F
-    I -->|Ya| K[Save Task]
-    G -->|Ya| K2[Hapus Task]
-    G -->|Tidak| D
-    H -->|Ya| K3[Tandai Completed]
-    H -->|Tidak| L[showinfo: sudah selesai] --> D
-    K --> M[Update Dashboard]
-    K2 --> M
-    K3 --> M
-    M --> N[Periksa tenggat tiap 30 detik]
-    N --> O{Ada tugas terlambat / mendekati tenggat baru?}
-    O -->|Ya| P[Show Reminder popup]
-    O -->|Tidak| Q[Tunggu interval berikutnya]
-    P --> Q
-    Q --> R{Aplikasi ditutup?}
-    R -->|Tidak| D
-    R -->|Ya| S([End])
+    Start([Mulai Aplikasi]) --> Load[Muat data/tasks.json atau data contoh]
+    Load --> Dash[Tampilkan Halaman Ringkasan]
+    Dash --> Timer[Jadwalkan Timer Pengingat 30 detik]
+
+    Dash --> Nav{Pilih Menu Sidebar}
+    Nav -->|Ringkasan| Dash
+    Nav -->|Daftar tugas| Tasks[Tampilkan Tabel Daftar Tugas]
+    Nav -->|Mode fokus| Focus[Tampilkan 1 Tugas Paling Mendesak]
+
+    Tasks --> Action{Pilih Aksi}
+    Action -->|Tambah / Ubah| Form[Buka Form Tugas]
+    Action -->|Lihat Detail| Detail[Tampilkan Detail Tugas]
+    Action -->|Tandai Selesai| Done[Ubah Status ke Completed]
+    Action -->|Hapus| Confirm{Konfirmasi Hapus?}
+
+    Form --> Validate{Validasi Input<br/>try / except}
+    Validate -->|Gagal| Err[Tampilkan Pesan Error] --> Form
+    Validate -->|Valid| Save[Simpan ke TaskManager & JSON]
+
+    Confirm -->|Ya| Save
+    Confirm -->|Tidak| Tasks
+    Done --> Save
+    Focus -->|Klik Tandai Selesai| Done
+
+    Save --> Notify[Perbarui Semua Halaman Otomatis]
+    Notify --> Tasks
+
+    Timer --> Check{Ada Tugas Terlambat /<br/>Mendekati Tenggat Baru?}
+    Check -->|Ya| Popup[Tampilkan Popup Pengingat]
+    Check -->|Tidak| Wait[Tunggu 30 Detik Berikutnya]
+    Popup --> Wait
+    Wait --> Close{Aplikasi Ditutup?}
+    Close -->|Tidak| Timer
+    Close -->|Ya| End([Simpan & Keluar])
 ```
